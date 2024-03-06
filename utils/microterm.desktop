@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=microterm
+Comment=Terminal emulator
+TryExec=microterm
+Exec=microterm
+Icon=terminal
+StartupNotify=true
+Terminal=false
+Categories=GTK;TerminalEmulator;Utility;
+X-AppStream-Ignore=True

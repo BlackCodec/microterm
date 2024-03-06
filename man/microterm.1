@@ -1,0 +1,123 @@
+.\" Manpage for microterm.
+.TH MICROTERM "1" "March 2024" "microterm" "User Commands"
+.SH NAME
+microterm \- (µterm) Simple VTE-based GTK terminal emulator
+.SH SYNOPSIS
+.B microterm
+[options]
+.SH DESCRIPTION
+microterm is a simple VTE-based GTK terminal emulator inspired by kermit.
+.SH OPTIONS
+.TP
+\fB\-c\fR <PATH>
+set the configuration file
+.TP
+\fB\-t\fR <TITLE>
+set the terminal title
+.TP
+\fB\-w\fR <DIR>
+set the working directory
+.TP
+\fB\-e\fR <CMD>
+set the command to run
+.TP
+\fB\-d\fR
+activate debug messages
+.TP
+\fB\-v\fR
+show version
+.TP
+\fB\-h\fR
+show help
+.SH BINDINGS
+microterm use the following key bindings <CTRL + SHIFT> followed by:
+.TP
+\fBC\fR: copy terminal selected text to clipboard
+.TP
+\fBV or insert\fR: paste clipboard content to terminal
+.TP
+\fBR\fR: reload configuration
+.TP
+\fBQ\fR: close the application
+.TP
+\fB\+\fR: increase terminal font size
+.TP
+\fB\-\fR: decrease terminal font size
+.TP
+\fB\=\fR: reset terminal font size
+.TP
+\fBup\fR: split terminal window vertically and put new terminal on top
+.TP
+\fBdown\fR: split terminal window vertically and put new terminal on bottom
+.TP
+\fBleft\fR: split terminal window horizontally and put new terminal on left
+.TP
+\fBright\fR: split terminal window horizontally and put new terminal on right
+.TP
+\fBT or return\fR: open a terminal in a new tab
+.TP
+\fBpage up\fR: switch to previous tab
+.TP
+\fBpage down\fR: switch to next tab
+.TP
+\fBbackspace\fR: close current tab if not last
+
+
+.SH CONFIGURATION FILE
+microterm search for configuration file stored in $HOME/.config/microterm/microterm.conf
+.TP
+Parameter for configuration file:
+.TP
+\fBlocale\fR <LOCALE>
+set terminal locale to use, default value: "en_US.UTF-8"
+.TP
+\fBchar\fR <CHAR_LIST>
+set VTE word chars list exception, default value: "-./?%&#_=+@~"
+.TP
+\fBtab\fR <bottom|top>
+set tab position, accepted values are bottom or top, default: top
+.TP
+\fBcopy_on_selection\fR <true|false>
+enable copy on text selection in terminal, accepted values are true or false, default: true
+.TP
+\fBfont\fR <FONT_NAME> <SIZE>
+set terminal font to specified font name and size, default: Monospace 9
+.TP
+\fBopacity\fR <0.00 to 1.00>
+set terminal opacity, accept any value from 0.00 to 1.00, default: 1.00
+.TP
+\fBcursor_shape\fR <underline|beam|block>
+set the cursor sharep in terminal, accepted values are underline or beam or, default: block
+.TP
+\fBcursor\fR <COLOR>
+set terminal cursor color, RGBA color, default: 0xffffff
+.TP
+\fBcursor_foreground\fR <COLOR>
+set terminal cursor foreground color, RGBA color, default: 0xffffff
+.TP
+\fBforeground\fR <COLOR>
+set terminal foreground color, RGBA color, default: 0xffffff
+.TP
+\fBforeground_bold\fR <COLOR>
+set terminal foreground color for bold text, RGBA color, default: 0xffffff
+.TP
+\fBbackground\fR <COLOR>
+set terminal background color, RGBA color, default: 0x000000
+.TP
+\fBcolor<0-15>\fR <COLOR>
+set 16 color scheme value, RGBA color
+.TP
+\fBinclude\fR <FILE_NAME>
+load the content of specified file. The file must be in the configuration directory.
+
+.SH BUGS
+No known bugs.
+Use "Issues" page for reporting bugs: <https://github.com/BlackCodec/microterm/issues/>
+
+.SH AUTHOR
+Written by Fabio Dell'Orso (BlackCodec) <f.dellorso@gmail.com>
+
+.SH COPYRIGHT
+Copyright © 2024 Fabio Dell'Orso
+.P
+GNU General Public License v3.0 only
