@@ -9,7 +9,7 @@ all: clean build
 build:
 	mkdir build || true
 	$(CC) $(CFLAGS) src/$(NAME).c -o build/$(NAME) $(LIBS)
-	cp config/$(NAME).desktop build/
+	cp utils/$(NAME).desktop build/
 	gzip -cn man/$(NAME).1 > build/$(NAME).1.gz
 
 # Make the installation
