@@ -680,7 +680,7 @@ static void parse_settings(char *input_file) {
         } else if (!strncmp(option, "background", strlen(option))) {
             term_background = parse_color(value);
         } else if (!strncmp(option, "copy_on_selection", strlen(option))) {
-            copy_on_selection = strncmp(value, "true", strlen(value));
+            copy_on_selection = (!strncmp(value, "true", strlen(value)));
         } else if (!strncmp(option, "include", strlen(option))) {
             parse_settings(get_path_to_config_file_name(value));
         } else if (!strncmp(option, "color", strlen(option) - 2)) {
