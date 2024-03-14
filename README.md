@@ -39,7 +39,6 @@ sudo make install
 - Uses the default shell (`$SHELL`)
 - Supports transparency with a composite manager
 - Supports base16 color schemes (customizable theme)
-- Supports custom keys and associated commands
 - Supports tabs
 - Supports multiple terminals on same tab with vertical/horizontal split
 
