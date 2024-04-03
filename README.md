@@ -4,6 +4,8 @@
 
 The project is inspired by [kermit](https://github.com/orhun/kermit) (by [Orhun Parmaksız](mailto:orhunparmaksiz@gmail.com)).
 
+**Release: 2.0**
+
 ---
 
 <details>
@@ -21,6 +23,7 @@ The project is inspired by [kermit](https://github.com/orhun/kermit) (by [Orhun 
 - [Screenshots](#screenshots)
 - [License](#license)
 - [Copyright](#copyright)
+- [Changelog](#changelog)
 </details>
  
 ---
@@ -39,6 +42,7 @@ sudo make install
 - Uses the default shell (`$SHELL`)
 - Supports transparency with a composite manager
 - Supports base16 color schemes (customizable theme)
+- Supports custom keys and associated commands
 - Supports tabs
 - Supports multiple terminals on same tab with vertical/horizontal split
 
@@ -58,22 +62,42 @@ microterm [-h] [-v] [-d] [-c config] [-t title] [-w workdir] [-e command]
 
 ## Key Bindings
 
-| Key                         | Action                                             |
-| --------------------------- | -------------------------------------------------- |
-| `ctrl-shift-[c]`            | copy to clipboard                                  |
-| `ctrl-shift-[v][insert]`    | paste from clipboard                               |
-| `ctrl-shift-[r]`            | reload configuration file                          |
-| `ctrl-shift-[q]`            | close the application                              |
-| `ctrl-shift-[+]`            | increase font size                                 |
-| `ctrl-shift-[-]`            | decrease font size                                 |
-| `ctrl-shift-[=]`            | reset font size to default                         |
-| `ctrl-shift-[up][down]`     | split vertically with new terminal on top /bottom  |
-| `ctrl-shift-[left][right]`  | split horizontally with new terminal on left/right |
-| `ctrl-shift-[t][return]`    | open a new terminal in a new tab                   |
-| `ctrl-shift-[page up]`      | switch to the previous tab                         |
-| `ctrl-shift-[page down]`    | switch to the next tab                             |
-| `ctrl-shift-[backspace]`    | close the selected tab                             |
+Key bindings now can be configured in config file with syntax:
+```
+ hotkey key_bindings_plus_separated function
+```
+for example:
 
+```
+hotkey Control+Shift+T new_tab
+hotkey Mod1+T new_tab
+```
+
+you can define more hotkeys for same function but each hotkey can be associated to only one function.
+
+### Functions
+
+Where valid functions are:
+
+ - copy: copy selected text to clipboard
+ - paste: paste from clipboard
+ - reload: reload configuration file
+ - quit: close the application (close all terminals)
+ - font_inc: increase font size
+ - font_dec: decrease font size
+ - font_reset: reset font size to default
+ - split_v: split vertically with a new terminal on bottom
+ - split_h: split horizzontally with a new terminal on right
+ - new_tab: open a new terminal in a new tab
+ - prev: switch to the previous tab
+ - next: switch to the next tab
+ - close: close selected tab
+ - goto <n>: go to specified tab
+ - cmd: open command prompt
+
+Check attached configuration file for reproduce hotkeys defined in version 1.0.
+
+The command prompt in configuration file is opened with the key "F2".
 
 ## Customization
 
@@ -133,3 +157,12 @@ GNU General Public License v3.0 only ([GPL-3.0-only](https://www.gnu.org/license
 ## Copyright
 
 Copyright © 2024 [BlackCodec](mailto:f.dellorso@gmail.com)
+
+## Changelog
+
+ - Release 2.0
+   - Added support for customize hotkeys
+   - Added command prompt function
+   - Added function to rename the tabs so the name will be changed when a tab is closed
+ - Release 1.0
+   - First release

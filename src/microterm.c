@@ -1,6 +1,6 @@
 /*
  * µterm (microterm), a simple VTE-based terminal emulator inspired by kermit.
- * Copyright © 2023 by Black_Codec <f.dellorso@gmail.com>
+ * Copyright © 2024 by Black_Codec <f.dellorso@gmail.com>
  * Site: <https://github.com/BlackCodec/microterm>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 #include <strings.h>
 #include <vte/vte.h>
 #include <ctype.h>
+#include <glib.h>
 
 #define UNUSED(x) (void)(x)
 #define CLR_R(x) (((x)&0xff0000) >> 16)
@@ -37,12 +38,14 @@
                       .alpha = a }
 
 
-static GtkWidget *window; // Main window
-static GtkWidget *notebook; // Tabs
+static GtkWidget* window; // Main window
+static GtkWidget* notebook; // Tabs
+static GtkWidget* current_terminal; // Current focues terminal
+static GtkWidget* commander; // Command prompt
 
 /* Fonts */
-static PangoFontDescription *font_desc;
-static char *font_size;
+static PangoFontDescription* font_desc;
+static char* font_size;
 static int current_font_size; // required for font inc and dec function
 
 /* Set default values */
@@ -54,26 +57,29 @@ static int term_cursor_color = TERM_CURSOR_COLOR;
 static int term_cursor_foreground = TERM_CURSOR_FG;
 static int term_cursor_shape = VTE_CURSOR_SHAPE_BLOCK;
 static int default_font_size = TERM_FONT_DEFAULT_SIZE;
-static char *term_font = TERM_FONT;
-static char *term_locale = TERM_LOCALE;
-static char *term_word_chars = TERM_WORD_CHARS;
+static char* term_font = TERM_FONT;
+static char* term_locale = TERM_LOCALE;
+static char* term_word_chars = TERM_WORD_CHARS;
 static GdkRGBA term_palette[TERM_PALETTE_SIZE]; /* Term color palette */
 static int tab_position = 0;
+static int commander_position = 1;
 static gboolean copy_on_selection = TRUE;
 static gboolean default_config_file = TRUE;
 static gboolean debug_mode = FALSE; /* Print debug messages */
 
 /* Runtimes */
 static int color_count = 0;
-static char *term_title;
-static char *word_chars;
-static char *working_dir; /* Working directory */
-static char *term_command; /* When use -e this value will be populated with passed command */
+static char* term_title;
+static char* word_chars;
+static char* working_dir; /* Working directory */
+static char* term_command; /* When use -e this value will be populated with passed command */
 static gchar **envp;
 static gchar **command;
 
-static char *config_file_name; /* Configuration file name */
+static char* config_file_name; /* Configuration file name */
+static GHashTable* hotkeys; /* Hotkey bindings */
 static va_list vargs;
+
 
 /*!
  * Print log (debug) message with format specifiers.
@@ -123,53 +129,108 @@ static gboolean on_terminal_exit(VteTerminal *terminal, gint status, gpointer us
     UNUSED(user_data);
     GtkWidget *term_widget = GTK_WIDGET(terminal);
     GtkWidget *parent = gtk_widget_get_parent(term_widget);
-    gtk_container_remove(GTK_CONTAINER(parent), term_widget);
-    while (parent != NULL) {
-        if (GTK_IS_NOTEBOOK(parent)) {
-            print_line("trace","Parent is notebook");
-            GtkWidget *current_page = gtk_notebook_get_nth_page (GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
-            GList *page_children = gtk_container_get_children(GTK_CONTAINER(current_page));
-            while (page_children != NULL && GTK_IS_CONTAINER(page_children->data))
-                page_children = gtk_container_get_children(GTK_CONTAINER(page_children->data));
-            if (page_children != NULL && GTK_IS_WIDGET(page_children->data)) {
-                print_line("trace","Found a child widget");
-                if (gtk_widget_get_can_focus(GTK_WIDGET(page_children->data))) {
-                    print_line("trace", "Set focus on child widget");
-                    gtk_widget_grab_focus(page_children->data);
+    if (GTK_IS_CONTAINER(parent)) {
+        gtk_container_remove(GTK_CONTAINER(parent), term_widget);
+        while (parent != NULL) {
+            if (GTK_IS_NOTEBOOK(parent)) {
+                print_line("trace","Parent is notebook");
+                GtkWidget *current_page = gtk_notebook_get_nth_page (GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
+                GList *page_children = gtk_container_get_children(GTK_CONTAINER(current_page));
+                while (page_children != NULL && GTK_IS_CONTAINER(page_children->data))
+                    page_children = gtk_container_get_children(GTK_CONTAINER(page_children->data));
+                if (page_children != NULL && GTK_IS_WIDGET(page_children->data)) {
+                    print_line("trace","Found a child widget");
+                    if (gtk_widget_get_can_focus(GTK_WIDGET(page_children->data))) {
+                        print_line("trace", "Set focus on child widget");
+                        gtk_widget_grab_focus(page_children->data);
+                        return TRUE;
+                    }
+                } else {
+                    print_line("warning","Empty notebook page, remove it");
+                    gtk_notebook_remove_page(GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
+                    gtk_widget_queue_draw(GTK_WIDGET(notebook));
+                    if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) < 1) { gtk_main_quit(); }
                     return TRUE;
                 }
-            } else {
-                print_line("warning","Empty notebook page, remove it");
-                gtk_notebook_remove_page(GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
-                gtk_widget_queue_draw(GTK_WIDGET(notebook));
-                if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) < 1) { gtk_main_quit(); }
+            } else if (GTK_IS_PANED(parent)) {
+                print_line("trace","Parent is box");
+                GList *children = gtk_container_get_children(GTK_CONTAINER(parent));
+                while (children != NULL && GTK_IS_CONTAINER(children->data))
+                    children = gtk_container_get_children(GTK_CONTAINER(children->data));
+                if (children != NULL && GTK_IS_WIDGET(children->data)) {
+                    print_line("trace","Found a child widget in the box");
+                    if (gtk_widget_get_can_focus(GTK_WIDGET(children->data))) {
+                        print_line("trace", "Set focus on child widget");
+                        gtk_widget_grab_focus(children->data);
+                        return TRUE;
+                    }
+                } else {
+                    print_line("warning","Empty box, remove it");
+                }
+            } else if (gtk_widget_get_can_focus(parent)) {
+                print_line("trace","Focus directly on parent");
+                gtk_widget_grab_focus(parent);
                 return TRUE;
             }
-        } else if (GTK_IS_PANED(parent)) {
-            print_line("trace","Parent is box");
-            GList *children = gtk_container_get_children(GTK_CONTAINER(parent));
-            while (children != NULL && GTK_IS_CONTAINER(children->data))
-                children = gtk_container_get_children(GTK_CONTAINER(children->data));
-            if (children != NULL && GTK_IS_WIDGET(children->data)) {
-                print_line("trace","Found a child widget in the box");
-                if (gtk_widget_get_can_focus(GTK_WIDGET(children->data))) {
-                    print_line("trace", "Set focus on child widget");
-                    gtk_widget_grab_focus(children->data);
-                    return TRUE;
-                }
-            } else {
-                print_line("warning","Empty box, remove it");
-            }
-        } else if (gtk_widget_get_can_focus(parent)) {
-            print_line("trace","Focus directly on parent");
-            gtk_widget_grab_focus(parent);
-            return TRUE;
+            GtkWidget *sup_parent = gtk_widget_get_parent(parent);
+            if (sup_parent != NULL) gtk_container_remove(GTK_CONTAINER(sup_parent), parent);
+            parent = sup_parent;
         }
-        GtkWidget *sup_parent = gtk_widget_get_parent(parent);
-        if (sup_parent != NULL) gtk_container_remove(GTK_CONTAINER(sup_parent), parent);
-        parent = sup_parent;
     }
     return TRUE;
+}
+
+/*!
+ * Handle command prompt input
+ *
+ * \param command_prompt_widget
+ * \param event
+ * \param user_data
+ * \return TRUE if valid command is processed
+ */
+static gboolean on_command(GtkWidget *self, GdkEventKey* event, gpointer user_data) {
+    UNUSED(user_data);
+    if (strcmp(gdk_keyval_name(event->keyval),"Return") == 0) {
+        char* function = gtk_entry_get_text(commander);
+        print_line("trace","Invoke function %s", function);
+        if (execute_function(function)) {
+            show_hide_commander();
+            gtk_widget_grab_focus(current_terminal);
+            return TRUE;
+        }
+    } else {
+        char* search_code = "";
+        if (event->state & GDK_CONTROL_MASK) search_code = g_strconcat(search_code,"Control+",NULL);
+        if (event->state & GDK_SHIFT_MASK) search_code = g_strconcat(search_code,"Shift+",NULL);
+        if (event->state & GDK_MOD1_MASK) search_code = g_strconcat(search_code,"Mod1+",NULL);
+        if (event->state & (GDK_SUPER_MASK | GDK_META_MASK)) search_code = g_strconcat(search_code,"Meta+",NULL);
+        search_code = g_strconcat(search_code,gdk_keyval_name(event->keyval),NULL);
+        char* function = g_hash_table_lookup(hotkeys,search_code);
+        if (function != NULL) {
+            print_line("trace","Hotkey code: %s", search_code);
+            if (get_function(function) == FUNCTION_COMMAND) {
+                show_hide_commander();
+                gtk_widget_grab_focus(current_terminal);
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+/*!
+ * Handle terminal get focus event.
+ * Set current_terminal value.
+ *
+ * \param terminal
+ * \param event
+ * \param user_data
+ * \return FALSE, no continue
+ */
+static gboolean has_focus(GtkWidget* terminal, GdkEventFocus event, gpointer user_data) {
+    UNUSED(user_data);
+    current_terminal = terminal;
+    return FALSE;
 }
 
 /*!
@@ -183,79 +244,124 @@ static gboolean on_terminal_exit(VteTerminal *terminal, gint status, gpointer us
 static gboolean on_hotkey(GtkWidget *terminal, GdkEventKey *event,gpointer user_data) {
     print_line("info","Hotkey method");
     UNUSED(user_data);
-    if ((event->state & (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) == (GDK_CONTROL_MASK | GDK_SHIFT_MASK)) {
-        print_line("trace","Check ctrl and shift");
-        switch (event->keyval) {
-            case GDK_KEY_C:
-            case GDK_KEY_c:
-                vte_terminal_copy_clipboard_format(VTE_TERMINAL(terminal), VTE_FORMAT_TEXT);
+    if (event->is_modifier == 0) {
+        char* code_string = gdk_keyval_name;
+        char* search_code = "";
+        if (event->state & GDK_CONTROL_MASK) search_code = g_strconcat(search_code,"Control+",NULL);
+        if (event->state & GDK_SHIFT_MASK) search_code = g_strconcat(search_code,"Shift+",NULL);
+        if (event->state & GDK_MOD1_MASK) search_code = g_strconcat(search_code,"Mod1+",NULL);
+        if (event->state & (GDK_SUPER_MASK | GDK_META_MASK)) search_code = g_strconcat(search_code,"Meta+",NULL);
+        search_code = g_strconcat(search_code,gdk_keyval_name(event->keyval),NULL);
+        print_line("trace","Hotkey code: %s", search_code);
+        char* function = g_hash_table_lookup(hotkeys,search_code);
+        if (function == NULL) return FALSE;
+        print_line("trace","Invoke funciont: %s (%d)", function, get_function(function));
+        current_terminal = terminal;
+        return execute_function(function);
+    }    
+    return FALSE;
+}
+
+/*!
+ * Function for go to specific page, show specific tab of notebook.
+ *
+ * \param function goto <page number>
+ * \return TRUE if valid page or FALSE.
+ */
+static gboolean go_to(char* function) {
+    print_line("info","go_to");
+    char* page_str = strtok(function, " ");
+    page_str = strtok(NULL, " ");
+    print_line("trace","Go to page %s", page_str);
+    gint page_num = atoi(page_str);
+    page_num--;
+    if (page_num >= 0 && page_num <= gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook))) {
+        print_line("trace","Page number int value: %d",page_num);
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook),page_num);
+        GtkWidget* page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook),page_num);
+        GList* children = gtk_container_get_children(GTK_CONTAINER(page));
+        while (children != NULL) {
+            if (VTE_IS_TERMINAL(children->data)) {
+                print_line("trace","Set focus on terminal");
+                gtk_widget_grab_focus(GTK_WIDGET(children->data));
                 return TRUE;
-            case GDK_KEY_KP_Insert:
-            case GDK_KEY_V:
-            case GDK_KEY_v:
-                vte_terminal_paste_clipboard(VTE_TERMINAL(terminal));
-                return TRUE;
-            case GDK_KEY_R:
-            case GDK_KEY_r:
-                print_line("debug","Reloading configuration file...\n");
-                if (default_config_file) parse_settings(get_default_config_file_name());
-                else parse_settings(config_file_name);
-                apply_terminal_settings(terminal);
-                return TRUE;
-            /* Exit */
-            case GDK_KEY_Q:
-            case GDK_KEY_q:
-                gtk_main_quit();
-                return TRUE;
-            /* Change font size */
-            case GDK_KEY_asterisk:
-            case GDK_KEY_KP_Add:
-                set_terminal_font(terminal, current_font_size + 1);
-                return TRUE;
-            case GDK_KEY_KP_Subtract:
-            case GDK_KEY_underscore:
-                set_terminal_font(terminal, current_font_size - 1);
-                return TRUE;
-            case GDK_KEY_KP_Enter:
-            case GDK_KEY_equal:
-                set_terminal_font(terminal, default_font_size);
-                return TRUE;
-            case GDK_KEY_Up:
-                add_terminal_next_to(terminal,TRUE,TRUE);
-                return TRUE;
-            case GDK_KEY_Down:
-                add_terminal_next_to(terminal,TRUE,FALSE);
-                return TRUE;
-            case GDK_KEY_Left:
-                add_terminal_next_to(terminal,FALSE,TRUE);
-                return TRUE;
-            case GDK_KEY_Right:
-                add_terminal_next_to(terminal,FALSE,FALSE);
-                return TRUE;
-            case GDK_KEY_T:
-            case GDK_KEY_t:
-            case GDK_KEY_Return:
-                add_new_tab();
-                return TRUE;
-            case GDK_KEY_KP_Page_Up:
-                gtk_notebook_prev_page(GTK_NOTEBOOK(notebook));
-                return TRUE;
-            case GDK_KEY_KP_Page_Down: 
-                gtk_notebook_next_page(GTK_NOTEBOOK(notebook));
-                return TRUE;
-            case GDK_KEY_BackSpace:
-                if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) == 1)
-                    return TRUE;
-                gtk_notebook_remove_page(GTK_NOTEBOOK(notebook),gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
-                gtk_widget_queue_draw(GTK_WIDGET(notebook));
-                return TRUE;
-            default:
-                print_line("trace","Send to vte: %s", gdk_keyval_name(event->keyval));
-                return FALSE;
+            } else if (GTK_IS_CONTAINER(children->data)) {
+                print_line("trace","Is container, loop inside");
+                children = gtk_container_get_children(GTK_CONTAINER(children->data));
+            } else if (GTK_IS_WIDGET(children->data)) {
+                print_line("trace","Is a widget set focus on it and iterate to next");
+                gtk_widget_grab_focus(GTK_WIDGET(children->data));
+                children->next;
+            }
         }
+        print_line("warning","Valid terminal not found");
+        return TRUE;
     }
     return FALSE;
 }
+
+/*!
+ * Parse string command and invoke correct function
+ *
+ * \param function string with command
+ * \return TRUE if command is valid.
+ */
+static gboolean execute_function(char* function) {
+    print_line("info","execute_function");
+    switch (get_function(function)) {
+        case FUNCTION_COPY:
+            vte_terminal_copy_clipboard_format(VTE_TERMINAL(current_terminal), VTE_FORMAT_TEXT);
+            return TRUE;
+        case FUNCTION_PASTE:
+            vte_terminal_paste_clipboard(VTE_TERMINAL(current_terminal));
+            return TRUE;
+        case FUNCTION_RELOAD:
+            if (default_config_file) parse_settings(get_default_config_file_name());
+            else parse_settings(config_file_name);
+            apply_terminal_settings(current_terminal);
+            return TRUE;
+        case FUNCTION_QUIT:
+            gtk_main_quit();
+            return TRUE;
+        case FUNCTION_FONT_INC:
+            set_terminal_font(current_terminal, current_font_size + 1);
+            return TRUE;
+        case FUNCTION_FONT_DEC:
+            set_terminal_font(current_terminal, current_font_size - 1);
+            return TRUE;
+        case FUNCTION_FONT_RESET:
+            set_terminal_font(current_terminal, default_font_size);
+            return TRUE;
+        case FUNCTION_SPLIT_V:
+            add_terminal_next_to(TRUE);
+            return TRUE;
+        case FUNCTION_SPLIT_H:
+            add_terminal_next_to(FALSE);
+            return TRUE;
+        case FUNCTION_NEW_TAB:
+            add_new_tab();
+            return TRUE;
+        case FUNCTION_PREV:
+            gtk_notebook_prev_page(GTK_NOTEBOOK(notebook));
+            return TRUE;
+        case FUNCTION_NEXT:
+            gtk_notebook_next_page(GTK_NOTEBOOK(notebook));
+            return TRUE;
+        case FUNCTION_CLOSE:
+            if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) > 1) {
+                gtk_notebook_remove_page(GTK_NOTEBOOK(notebook),gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
+                gtk_widget_queue_draw(GTK_WIDGET(notebook));
+            }
+            return TRUE;
+        case FUNCTION_GOTO:
+            return go_to(function);
+        case FUNCTION_COMMAND:
+            show_hide_commander();
+            return TRUE;
+    }
+    return FALSE;
+}
+
 
 /*!
  * Handle change on terminal title and propagate to window
@@ -315,6 +421,9 @@ static void on_tab_del(GtkNotebook *notebook, GtkWidget *child, guint page_num, 
             print_line("trace","Hide tabs");
             gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
             gtk_widget_queue_draw(GTK_WIDGET(notebook));
+            GtkWidget* active_page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook),0);
+            GtkWidget *label = gtk_label_new("1");
+            gtk_notebook_set_tab_label(GTK_NOTEBOOK(notebook), active_page, label);
         }
     } else if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) == 1) {
         print_line("info","Removed last page, quit");
@@ -323,6 +432,15 @@ static void on_tab_del(GtkNotebook *notebook, GtkWidget *child, guint page_num, 
         print_line("trace","Show tabs");
         gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), TRUE);
         gtk_widget_queue_draw(GTK_WIDGET(notebook));
+        if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) == page_num) {
+            print_line("trace", "removed last page nothing to do");
+        } else {
+            int pi;
+            for (pi=page_num;pi<gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook));pi++) {
+                GtkWidget *label = gtk_label_new(g_strdup_printf("%d", pi+1));
+                gtk_notebook_set_tab_label(GTK_NOTEBOOK(notebook), gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook),pi), label);
+            }
+        }
     }
 }
 
@@ -433,19 +551,18 @@ static void add_new_tab() {
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), box, label);
     if (gtk_widget_get_can_focus(new_term)) {
         gtk_widget_grab_focus(new_term);
+        current_terminal = new_term;
     }
 }
 
 /*!
  * Add terminal next to another terminal
  *
- * \param terminal
  * \param vertical (true or false for horizontal)
- * \param first (true for start, false for end)
  */
-static void add_terminal_next_to(GtkWidget *terminal, gboolean vertical, gboolean first) {
+static void add_terminal_next_to(gboolean vertical) {
     print_line("info","Add terminal next to current");
-    GtkWidget *parent = gtk_widget_get_parent(terminal);
+    GtkWidget *parent = gtk_widget_get_parent(current_terminal);
     GtkWidget *new_term = create_terminal();
     GtkWidget *box;
     print_line("trace","Current page: %d",gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
@@ -458,23 +575,26 @@ static void add_terminal_next_to(GtkWidget *terminal, gboolean vertical, gboolea
     }
     GList *children = gtk_container_get_children(GTK_CONTAINER(parent));
     print_line("trace","Parent size: %d",g_list_length(children));
+    g_object_ref(current_terminal);
     if (GTK_IS_NOTEBOOK(parent)) {
         print_line("trace","Remove terminal from notebook");
-        gtk_container_remove(GTK_CONTAINER(parent), terminal);
+        gtk_container_remove(GTK_CONTAINER(parent), current_terminal);
         print_line("trace", "Add the box to notebook");
         gtk_container_add(GTK_CONTAINER(parent), box);
     } else if (GTK_IS_PANED(parent)) {
         int i;
         for (i = 0; i < g_list_length(children); i++) {
             GList *record = g_list_nth(children,i);
-            GtkWidget *child = GTK_WIDGET(record->data);
-            if (child == terminal) {
-                print_line("trace", "Found at %d",i);
-                break;
+            if (GTK_IS_WIDGET(record->data)) {
+                GtkWidget *child = GTK_WIDGET(record->data);
+                if (child == current_terminal) {
+                    print_line("trace", "Found at %d",i);
+                    break;
+                }
             }
         }
         print_line("trace","Child position: %d",i);
-        gtk_container_remove (GTK_CONTAINER(parent), terminal);
+        gtk_container_remove (GTK_CONTAINER(parent), current_terminal);
         if (i == 0) {
             print_line("trace","Box at start");
             gtk_paned_pack1(GTK_PANED(parent), box, TRUE, TRUE);
@@ -485,19 +605,16 @@ static void add_terminal_next_to(GtkWidget *terminal, gboolean vertical, gboolea
     } else {
         print_line("error","Unexpected");
     }
-    if (first) {
-        print_line("trace","Add new_terminal at start");
-        gtk_paned_pack1(GTK_PANED(box), new_term, TRUE, TRUE);
-        gtk_paned_pack2(GTK_PANED(box), terminal, TRUE, TRUE);
-    } else {
-        print_line("trace","Add new_terminal at end");
-        gtk_paned_pack2(GTK_PANED(box), new_term, TRUE, TRUE);
-        gtk_paned_pack1(GTK_PANED(box), terminal, TRUE, TRUE);
-    }
-    gtk_widget_show(box);
-    gtk_widget_show(new_term);
+    gtk_paned_set_wide_handle (GTK_PANED(box),TRUE);
+    print_line("trace","Add old terminal");
+    gtk_paned_pack1(GTK_PANED(box), current_terminal, TRUE, TRUE);
+    g_object_unref(current_terminal);
+    print_line("trace","Add new_terminal at end");
+    gtk_paned_pack2(GTK_PANED(box), new_term, TRUE, TRUE);
+    gtk_widget_show_all(box);
     print_line("trace","Set focus to new terminal");
     gtk_widget_grab_focus(new_term);
+    current_terminal = new_term;
 }
 
 /*!
@@ -505,7 +622,7 @@ static void add_terminal_next_to(GtkWidget *terminal, gboolean vertical, gboolea
  *
  * \return terminal (GtkWidget)
  */
-static GtkWidget *create_terminal() {
+static GtkWidget* create_terminal() {
     print_line("info","Create new terminal");
     GtkWidget *terminal = vte_terminal_new();
     print_line("trace","Connect signals to terminal");
@@ -513,6 +630,7 @@ static GtkWidget *create_terminal() {
     g_signal_connect(terminal, "key-press-event", G_CALLBACK(on_hotkey), NULL);
     g_signal_connect(terminal, "window-title-changed", G_CALLBACK(on_terminal_title_change), GTK_WINDOW(window));
     g_signal_connect(terminal, "selection-changed", G_CALLBACK(on_terminal_selection), NULL);
+    g_signal_connect(terminal, "focus-in-event", G_CALLBACK(has_focus), NULL);
     print_line("trace","Configure terminal");
     apply_terminal_settings(terminal);
     envp = g_get_environ();
@@ -535,6 +653,23 @@ static GtkWidget *create_terminal() {
 }
 
 /*!
+ * Show or hide command prompt
+ */
+static void show_hide_commander() {
+    if (gtk_widget_is_visible(commander)) {
+        print_line("info","Hide commander");
+        gtk_entry_set_text(GTK_ENTRY(commander),"");
+        gtk_widget_set_sensitive(commander,FALSE);
+        gtk_widget_hide(commander);
+    } else {
+        print_line("info","Show commander");
+        gtk_widget_show(commander);
+        gtk_widget_set_sensitive(commander,TRUE);
+        gtk_widget_grab_focus(commander);
+    }
+}
+
+/*!
  * Initialize and start the terminal.
  *
  * \return 0 on success
@@ -552,6 +687,8 @@ static int start_application() {
     gtk_widget_override_background_color(window, GTK_STATE_FLAG_NORMAL, &CLR_GDK(term_background, term_opacity));
     print_line("trace","Create notebook");
     notebook = gtk_notebook_new();
+    commander = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(commander),"Command:");
     if (tab_position == 0) gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_BOTTOM);
     else gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_TOP);
     gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
@@ -563,10 +700,20 @@ static int start_application() {
     print_line("trace","Add event to notebook");
     g_signal_connect(notebook, "page-added", G_CALLBACK(on_tab_add), NULL);
     g_signal_connect(notebook, "page-removed", G_CALLBACK(on_tab_del), NULL);
+    g_signal_connect(commander,"key-press-event", G_CALLBACK(on_command), NULL);
     print_line("trace","Add notebook to window");
-    gtk_container_add(GTK_CONTAINER(window), notebook);
+    GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL,1);
+    if (commander_position == 0) {
+        gtk_box_pack_start(GTK_BOX(box),notebook,TRUE,TRUE,0);
+        gtk_box_pack_end(GTK_BOX(box),commander,FALSE,TRUE,0);
+    } else {
+        gtk_box_pack_end(GTK_BOX(box),notebook,TRUE,TRUE,0);
+        gtk_box_pack_start(GTK_BOX(box),commander,FALSE,TRUE,0);
+    }
+    gtk_container_add(GTK_CONTAINER(window), box);
     print_line("trace","Show window and all content");
     gtk_widget_show_all(window);
+    gtk_widget_hide(commander);
     print_line("trace","Add first tab to notebook");
     add_new_tab();
     gtk_main();
@@ -592,7 +739,7 @@ static int parse_color(char *value) {
  *
  * \return default config file name
  */
-static char *get_default_config_file_name() {
+static char* get_default_config_file_name() {
     return g_strconcat(getenv("HOME"), APP_CONFIG_DIR, APP_NAME,"/",APP_NAME,".conf", NULL);
 }
 
@@ -623,7 +770,8 @@ static void parse_settings(char *input_file) {
     print_line("info","Prse config file");
     char buf[TERM_CONFIG_LENGTH],
         option[TERM_CONFIG_LENGTH],
-        value[TERM_CONFIG_LENGTH];
+        value[TERM_CONFIG_LENGTH],
+        data[TERM_CONFIG_LENGTH];
     if (input_file == NULL) {
         print_line("error","Invalid file name");
     } else {
@@ -638,8 +786,8 @@ static void parse_settings(char *input_file) {
         // Skip empty lines or lines that starting with '#'
         if (is_empty(buf) || buf[0] == '#')
             continue;
-        sscanf(buf, "%s %s\n", option, value);
-        print_line("trace", "Set option %s -> %s", option, value);
+        sscanf(buf, "%s %s %[^\n]\n", option, value, data);
+        print_line("trace", "Set option %s -> %s (%s)", option, value, data);
         if (!strncmp(option, "locale", strlen(option))) {
             term_locale = g_strdup(value);
         } else if (!strncmp(option, "char", strlen(option))) {
@@ -652,13 +800,18 @@ static void parse_settings(char *input_file) {
                 tab_position = 0;
             else
                 tab_position = 1;
+        } else if (!strncmp(option, "commander", strlen(option))) {
+            if (!strncmp(value, "bottom", strlen(value)))
+                commander_position = 0;
+            else
+                commander_position = 1;
         } else if (!strncmp(option, "font", strlen(option))) {
-            sscanf(buf, "%s %[^\n]\n", option, value);
-            font_size = strrchr(value, ' ');
+            font_size = strrchr(data, ' ');
             if (font_size != NULL) {
                 default_font_size = atoi(font_size + 1);
                 *font_size = 0;
-                term_font = g_strdup(value);
+                //term_font = g_strdup(value);
+                term_font = g_strconcat(value, " ", data);
             }
         } else if (!strncmp(option, "opacity", strlen(option))) {
             term_opacity = atof(value);
@@ -689,9 +842,45 @@ static void parse_settings(char *input_file) {
                 term_palette[atoi(color_index + 1)] = CLR_GDK(parse_color(value), 0);
                 color_count++;
             }
+        } else if (!strncmp(option, "hotkey", strlen(option))) {
+            parse_hotkey(value,data);
         }
+        memset(data, '\0', sizeof(data)); 
     }
     fclose(config_file);
+}
+
+/*!
+ * Convert string function to int values defined in headers.
+ *
+ * \param function string with function name
+ * \return int value of function or 0 if not found
+ */
+static int get_function(char* function) {
+    if (strcmp(function,"close") == 0) return FUNCTION_CLOSE;
+    else if (strcmp(function,"cmd") == 0) return FUNCTION_COMMAND;
+    else if (strcmp(function,"copy") == 0) return FUNCTION_COPY;
+    else if (strcmp(function,"font_dec") == 0) return FUNCTION_FONT_DEC;
+    else if (strcmp(function,"font_inc") == 0) return FUNCTION_FONT_INC;
+    else if (strcmp(function,"font_reset") == 0) return FUNCTION_FONT_RESET;
+    else if (strcmp(function,"new_tab") == 0) return FUNCTION_NEW_TAB;
+    else if (strcmp(function,"next") == 0) return FUNCTION_NEXT;
+    else if (strcmp(function,"prev") == 0) return FUNCTION_PREV;
+    else if (strcmp(function,"quit") == 0) return FUNCTION_QUIT;
+    else if (strcmp(function,"reload") == 0) return FUNCTION_RELOAD;
+    else if (strcmp(function,"split_h") == 0) return FUNCTION_SPLIT_H;
+    else if (strcmp(function,"split_v") == 0) return FUNCTION_SPLIT_V;
+    else if (strlen(function) > 4 && strncmp("goto",function,4) == 0) return FUNCTION_GOTO;
+    return 0;
+}
+
+/*!
+ * Stores hotkey and function in hotkeys hashtable
+ */
+static void parse_hotkey(char* hotkey, char* function) {
+    print_line("info","parse_hotkey");
+    print_line("trace","Hotkey to parse: %s -> %s", hotkey, function);
+    g_hash_table_insert(hotkeys, g_strdup(hotkey),g_strdup(function));
 }
 
 /*!
@@ -747,11 +936,13 @@ static int parse_params(int argc, char **argv) {
  * Main method
  */
 int main(int argc, char *argv[]) {
+    hotkeys = g_hash_table_new(g_str_hash,g_str_equal);
     if (parse_params(argc, argv))
         return 0;
     if (default_config_file) parse_settings(get_default_config_file_name());
     else parse_settings(config_file_name);
     gtk_init(&argc, &argv);
+    print_line("trace","Hotkeys defined: %d",g_hash_table_size(hotkeys));
     start_application();
     return 0;
 }

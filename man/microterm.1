@@ -1,5 +1,5 @@
 .\" Manpage for microterm.
-.TH MICROTERM "1" "March 2024" "microterm" "User Commands"
+.TH MICROTERM "3" "April 2024" "microterm" "User Commands"
 .SH NAME
 microterm \- (µterm) Simple VTE-based GTK terminal emulator
 .SH SYNOPSIS
@@ -7,6 +7,8 @@ microterm \- (µterm) Simple VTE-based GTK terminal emulator
 [options]
 .SH DESCRIPTION
 microterm is a simple VTE-based GTK terminal emulator inspired by kermit.
+.SH RELEASE
+Current release: 2.0
 .SH OPTIONS
 .TP
 \fB\-c\fR <PATH>
@@ -30,38 +32,43 @@ show version
 \fB\-h\fR
 show help
 .SH BINDINGS
-microterm use the following key bindings <CTRL + SHIFT> followed by:
+Bindings in microterm are defined in configuration file with the parameter hotkey:
 .TP
-\fBC\fR: copy terminal selected text to clipboard
+\fBhotkey key_binding function\fR
 .TP
-\fBV or insert\fR: paste clipboard content to terminal
+Key binding is a sequence of keyboard button separated by a plus sign (+).
+.SH FUNCTIONS
+Valid functions are:
 .TP
-\fBR\fR: reload configuration
+\fBcopy\fR: copy selected text to clipboard
 .TP
-\fBQ\fR: close the application
+\fBpaste\fR: paste from clipboard
 .TP
-\fB\+\fR: increase terminal font size
+\fBreload\fR: reload configuration file
 .TP
-\fB\-\fR: decrease terminal font size
+\fBquit\fR: close the application (close all terminals)
 .TP
-\fB\=\fR: reset terminal font size
+\fBfont_inc\fR: increase font size
 .TP
-\fBup\fR: split terminal window vertically and put new terminal on top
+\fBfont_dec\fR: decrease font size
 .TP
-\fBdown\fR: split terminal window vertically and put new terminal on bottom
+\fBfont_reset\fR: reset font size to default
 .TP
-\fBleft\fR: split terminal window horizontally and put new terminal on left
+\fBsplit_v\fR: split vertically with a new terminal on bottom
 .TP
-\fBright\fR: split terminal window horizontally and put new terminal on right
+\fBsplit_h\fR: split horizzontally with a new terminal on right
 .TP
-\fBT or return\fR: open a terminal in a new tab
+\fBnew_tab\fR: open a new terminal in a new tab
 .TP
-\fBpage up\fR: switch to previous tab
+\fBprev\fR: switch to the previous tab
 .TP
-\fBpage down\fR: switch to next tab
+\fBnext\fR: switch to the next tab
 .TP
-\fBbackspace\fR: close current tab if not last
-
+\fBclose\fR: close selected tab
+.TP
+\fBgoto <n>\fR: go to specified tab
+.TP
+\fBcmd\fR: open command prompt
 
 .SH CONFIGURATION FILE
 microterm search for configuration file stored in $HOME/.config/microterm/microterm.conf
@@ -76,6 +83,9 @@ set VTE word chars list exception, default value: "-./?%&#_=+@~"
 .TP
 \fBtab\fR <bottom|top>
 set tab position, accepted values are bottom or top, default: top
+.TP
+\fBcommander\fR <bottom|top>
+set commander position, accepted values are bottom or top, default: bottom
 .TP
 \fBcopy_on_selection\fR <true|false>
 enable copy on text selection in terminal, accepted values are true or false, default: true
@@ -106,6 +116,10 @@ set terminal background color, RGBA color, default: 0x000000
 .TP
 \fBcolor<0-15>\fR <COLOR>
 set 16 color scheme value, RGBA color
+.TP
+\fBhotkey\fR <key binding plus separated> <function>
+set the hotkey on terminal, when combination of defined hotkey buttons are pressed 
+the function will be executed
 .TP
 \fBinclude\fR <FILE_NAME>
 load the content of specified file. The file must be in the configuration directory.
