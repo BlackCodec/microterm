@@ -18,7 +18,7 @@
 
 #include <vte/vte.h>
 #define APP_NAME "microterm"
-#define APP_RELEASE "2.0"
+#define APP_RELEASE "2.1"
 #define TERM_FONT "Monospace"
 #define TERM_FONT_DEFAULT_SIZE 9
 #define TERM_LOCALE "en_US.UTF-8"
@@ -51,6 +51,7 @@
 #define FUNCTION_PREV 11
 #define FUNCTION_NEXT 12
 #define FUNCTION_CLOSE 13
+#define FUNCTION_EXEC 30
 #define FUNCTION_GOTO 50
 #define FUNCTION_COMMAND 100
 
@@ -69,5 +70,5 @@ static gboolean execute_function(char* function);
 static gboolean on_command(GtkWidget* commander, GdkEventKey* event, gpointer user_data);
 
 static gboolean go_to(char* page_str);
-
+static gboolean send_command_to_terminal(char* function);
 static gboolean has_focus(GtkWidget* terminal, GdkEventFocus event, gpointer user_data);

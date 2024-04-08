@@ -255,11 +255,32 @@ static gboolean on_hotkey(GtkWidget *terminal, GdkEventKey *event,gpointer user_
         print_line("trace","Hotkey code: %s", search_code);
         char* function = g_hash_table_lookup(hotkeys,search_code);
         if (function == NULL) return FALSE;
-        print_line("trace","Invoke funciont: %s (%d)", function, get_function(function));
+        print_line("trace","Invoke function: %s (%d)", function, get_function(function));
         current_terminal = terminal;
         return execute_function(function);
     }    
     return FALSE;
+}
+
+/*!
+ * Function for execute specific command in current terminal.
+ *
+ * \param function exec <command to exec>
+ * \return TRUE if valid page or FALSE.
+ */
+static gboolean send_command_to_terminal(char* function) {
+    print_line("info","send_command_to_terminal");
+    char* page_str = strtok(function, " ");
+    gboolean completed=FALSE;
+    page_str = strtok(NULL, " ");
+    while (page_str != NULL) {
+        vte_terminal_feed_child(VTE_TERMINAL(current_terminal),page_str,-1);
+        vte_terminal_feed_child(VTE_TERMINAL(current_terminal)," ",-1);
+        page_str = strtok(NULL, " ");
+        completed=TRUE;
+    }
+    if (completed) vte_terminal_feed_child(VTE_TERMINAL(current_terminal),"\n",-1);
+    return completed;
 }
 
 /*!
@@ -353,6 +374,8 @@ static gboolean execute_function(char* function) {
                 gtk_widget_queue_draw(GTK_WIDGET(notebook));
             }
             return TRUE;
+        case FUNCTION_EXEC:
+            return send_command_to_terminal(function);
         case FUNCTION_GOTO:
             return go_to(function);
         case FUNCTION_COMMAND:
@@ -748,7 +771,7 @@ static char* get_default_config_file_name() {
  *
  * \return config file name full path
  */
-static char *get_path_to_config_file_name(char * file_name) {
+static char* get_path_to_config_file_name(char * file_name) {
     return g_strconcat(getenv("HOME"), APP_CONFIG_DIR, APP_NAME,"/",file_name, NULL);
 }
 
@@ -860,6 +883,7 @@ static int get_function(char* function) {
     if (strcmp(function,"close") == 0) return FUNCTION_CLOSE;
     else if (strcmp(function,"cmd") == 0) return FUNCTION_COMMAND;
     else if (strcmp(function,"copy") == 0) return FUNCTION_COPY;
+    else if (strcmp(function,"paste") == 0) return FUNCTION_PASTE;
     else if (strcmp(function,"font_dec") == 0) return FUNCTION_FONT_DEC;
     else if (strcmp(function,"font_inc") == 0) return FUNCTION_FONT_INC;
     else if (strcmp(function,"font_reset") == 0) return FUNCTION_FONT_RESET;
@@ -871,6 +895,7 @@ static int get_function(char* function) {
     else if (strcmp(function,"split_h") == 0) return FUNCTION_SPLIT_H;
     else if (strcmp(function,"split_v") == 0) return FUNCTION_SPLIT_V;
     else if (strlen(function) > 4 && strncmp("goto",function,4) == 0) return FUNCTION_GOTO;
+    else if (strlen(function) > 4 && strncmp("exec",function,4) == 0) return FUNCTION_EXEC;
     return 0;
 }
 

@@ -1,5 +1,5 @@
 .\" Manpage for microterm.
-.TH MICROTERM "3" "April 2024" "microterm" "User Commands"
+.TH MICROTERM "08" "April 2024" "microterm" "User Commands"
 .SH NAME
 microterm \- (µterm) Simple VTE-based GTK terminal emulator
 .SH SYNOPSIS
@@ -8,7 +8,7 @@ microterm \- (µterm) Simple VTE-based GTK terminal emulator
 .SH DESCRIPTION
 microterm is a simple VTE-based GTK terminal emulator inspired by kermit.
 .SH RELEASE
-Current release: 2.0
+Current release: 2.1
 .SH OPTIONS
 .TP
 \fB\-c\fR <PATH>
@@ -67,6 +67,8 @@ Valid functions are:
 \fBclose\fR: close selected tab
 .TP
 \fBgoto <n>\fR: go to specified tab
+.TP
+\fBexec <command>\fR: send specified command to current terminal and execute (press return)
 .TP
 \fBcmd\fR: open command prompt
 

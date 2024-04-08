@@ -4,7 +4,7 @@
 
 The project is inspired by [kermit](https://github.com/orhun/kermit) (by [Orhun Parmaksız](mailto:orhunparmaksiz@gmail.com)).
 
-**Release: 2.0**
+**Release: 2.1**
 
 ---
 
@@ -92,7 +92,8 @@ Where valid functions are:
  - prev: switch to the previous tab
  - next: switch to the next tab
  - close: close selected tab
- - goto <n>: go to specified tab
+ - goto `n`: go to specified tab
+ - exec `command`: send and execute the command to current terminal
  - cmd: open command prompt
 
 Check attached configuration file for reproduce hotkeys defined in version 1.0.
@@ -156,10 +157,13 @@ GNU General Public License v3.0 only ([GPL-3.0-only](https://www.gnu.org/license
 
 ## Copyright
 
-Copyright © 2024 [BlackCodec](mailto:f.dellorso@gmail.com)
+Copyright © 2024 [BlackCodec](mailto:blackcodec@null.net)
 
 ## Changelog
 
+ - Release 2.1
+   - Solved issue with paste hotkeys
+   - Added support for exec function
  - Release 2.0
    - Added support for customize hotkeys
    - Added command prompt function
