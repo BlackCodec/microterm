@@ -4,7 +4,7 @@
 
 The project is inspired by [kermit](https://github.com/orhun/kermit) (by [Orhun Parmaksız](mailto:orhunparmaksiz@gmail.com)).
 
-**Release: 2.1**
+**Release: 2.2**
 
 ---
 
@@ -161,6 +161,9 @@ Copyright © 2024 [BlackCodec](mailto:blackcodec@null.net)
 
 ## Changelog
 
+ - Release 2.2
+   - Add support for focus_follow_mouse option
+   - Code optimization
  - Release 2.1
    - Solved issue with paste hotkeys
    - Added support for exec function

@@ -1,6 +1,6 @@
 /*
  * µterm (microterm), a simple VTE-based terminal emulator inspired by kermit.
- * Copyright © 2024 by Black_Codec <f.dellorso@gmail.com>
+ * Copyright © 2024 by Black_Codec <blackcodec@null.net>
  * Site: <https://github.com/BlackCodec/microterm>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 
 #include <vte/vte.h>
 #define APP_NAME "microterm"
-#define APP_RELEASE "2.1"
+#define APP_RELEASE "2.2"
 #define TERM_FONT "Monospace"
 #define TERM_FONT_DEFAULT_SIZE 9
 #define TERM_LOCALE "en_US.UTF-8"
@@ -72,3 +72,4 @@ static gboolean on_command(GtkWidget* commander, GdkEventKey* event, gpointer us
 static gboolean go_to(char* page_str);
 static gboolean send_command_to_terminal(char* function);
 static gboolean has_focus(GtkWidget* terminal, GdkEventFocus event, gpointer user_data);
+static gboolean focus_change(GtkWidget* terminal, GdkEventMotion event, gpointer user_data);

@@ -1,6 +1,6 @@
 /*
  * µterm (microterm), a simple VTE-based terminal emulator inspired by kermit.
- * Copyright © 2024 by Black_Codec <f.dellorso@gmail.com>
+ * Copyright © 2024 by Black_Codec <blackcodec@null.net>
  * Site: <https://github.com/BlackCodec/microterm>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -63,6 +63,7 @@ static char* term_word_chars = TERM_WORD_CHARS;
 static GdkRGBA term_palette[TERM_PALETTE_SIZE]; /* Term color palette */
 static int tab_position = 0;
 static int commander_position = 1;
+static gboolean focus_follow_mouse = FALSE;
 static gboolean copy_on_selection = TRUE;
 static gboolean default_config_file = TRUE;
 static gboolean debug_mode = FALSE; /* Print debug messages */
@@ -135,23 +136,24 @@ static gboolean on_terminal_exit(VteTerminal *terminal, gint status, gpointer us
             if (GTK_IS_NOTEBOOK(parent)) {
                 print_line("trace","Parent is notebook");
                 GtkWidget *current_page = gtk_notebook_get_nth_page (GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
-                GList *page_children = gtk_container_get_children(GTK_CONTAINER(current_page));
-                while (page_children != NULL && GTK_IS_CONTAINER(page_children->data))
-                    page_children = gtk_container_get_children(GTK_CONTAINER(page_children->data));
-                if (page_children != NULL && GTK_IS_WIDGET(page_children->data)) {
-                    print_line("trace","Found a child widget");
-                    if (gtk_widget_get_can_focus(GTK_WIDGET(page_children->data))) {
-                        print_line("trace", "Set focus on child widget");
-                        gtk_widget_grab_focus(page_children->data);
-                        return TRUE;
+                if (GTK_IS_CONTAINER(current_page)) {
+                    GList *page_children = gtk_container_get_children(GTK_CONTAINER(current_page));
+                    while (page_children != NULL && GTK_IS_CONTAINER(page_children->data))
+                        page_children = gtk_container_get_children(GTK_CONTAINER(page_children->data));
+                    if (page_children != NULL && GTK_IS_WIDGET(page_children->data)) {
+                        print_line("trace","Found a child widget");
+                        if (gtk_widget_get_can_focus(GTK_WIDGET(page_children->data))) {
+                            print_line("trace", "Set focus on child widget");
+                            gtk_widget_grab_focus(page_children->data);
+                            return TRUE;
+                        }
                     }
-                } else {
-                    print_line("warning","Empty notebook page, remove it");
-                    gtk_notebook_remove_page(GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
-                    gtk_widget_queue_draw(GTK_WIDGET(notebook));
-                    if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) < 1) { gtk_main_quit(); }
-                    return TRUE;
-                }
+                } 
+                print_line("warning","Empty notebook page, remove it");
+                gtk_notebook_remove_page(GTK_NOTEBOOK(notebook), gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook)));
+                gtk_widget_queue_draw(GTK_WIDGET(notebook));
+                if (gtk_notebook_get_n_pages(GTK_NOTEBOOK(notebook)) < 1) { gtk_main_quit(); }
+                return TRUE;
             } else if (GTK_IS_PANED(parent)) {
                 print_line("trace","Parent is box");
                 GList *children = gtk_container_get_children(GTK_CONTAINER(parent));
@@ -191,7 +193,7 @@ static gboolean on_terminal_exit(VteTerminal *terminal, gint status, gpointer us
 static gboolean on_command(GtkWidget *self, GdkEventKey* event, gpointer user_data) {
     UNUSED(user_data);
     if (strcmp(gdk_keyval_name(event->keyval),"Return") == 0) {
-        char* function = gtk_entry_get_text(commander);
+        char* function = g_strconcat(gtk_entry_get_text(GTK_ENTRY(commander)), NULL);
         print_line("trace","Invoke function %s", function);
         if (execute_function(function)) {
             show_hide_commander();
@@ -229,7 +231,17 @@ static gboolean on_command(GtkWidget *self, GdkEventKey* event, gpointer user_da
  */
 static gboolean has_focus(GtkWidget* terminal, GdkEventFocus event, gpointer user_data) {
     UNUSED(user_data);
+    print_line("trace","Get focus");
     current_terminal = terminal;
+    return FALSE;
+}
+
+static gboolean focus_change(GtkWidget* terminal, GdkEventMotion event, gpointer user_data) {
+    UNUSED(user_data);
+    if (focus_follow_mouse && !gtk_widget_is_focus(terminal)) {
+        print_line("trace","Focus change");
+        gtk_widget_grab_focus(terminal);
+    }
     return FALSE;
 }
 
@@ -245,7 +257,6 @@ static gboolean on_hotkey(GtkWidget *terminal, GdkEventKey *event,gpointer user_
     print_line("info","Hotkey method");
     UNUSED(user_data);
     if (event->is_modifier == 0) {
-        char* code_string = gdk_keyval_name;
         char* search_code = "";
         if (event->state & GDK_CONTROL_MASK) search_code = g_strconcat(search_code,"Control+",NULL);
         if (event->state & GDK_SHIFT_MASK) search_code = g_strconcat(search_code,"Shift+",NULL);
@@ -312,7 +323,7 @@ static gboolean go_to(char* function) {
             } else if (GTK_IS_WIDGET(children->data)) {
                 print_line("trace","Is a widget set focus on it and iterate to next");
                 gtk_widget_grab_focus(GTK_WIDGET(children->data));
-                children->next;
+                children = children->next;
             }
         }
         print_line("warning","Valid terminal not found");
@@ -654,6 +665,7 @@ static GtkWidget* create_terminal() {
     g_signal_connect(terminal, "window-title-changed", G_CALLBACK(on_terminal_title_change), GTK_WINDOW(window));
     g_signal_connect(terminal, "selection-changed", G_CALLBACK(on_terminal_selection), NULL);
     g_signal_connect(terminal, "focus-in-event", G_CALLBACK(has_focus), NULL);
+    g_signal_connect(terminal, "motion-notify-event",G_CALLBACK(focus_change),NULL);
     print_line("trace","Configure terminal");
     apply_terminal_settings(terminal);
     envp = g_get_environ();
@@ -833,8 +845,7 @@ static void parse_settings(char *input_file) {
             if (font_size != NULL) {
                 default_font_size = atoi(font_size + 1);
                 *font_size = 0;
-                //term_font = g_strdup(value);
-                term_font = g_strconcat(value, " ", data);
+                term_font = g_strconcat(value, " ", data, NULL);
             }
         } else if (!strncmp(option, "opacity", strlen(option))) {
             term_opacity = atof(value);
@@ -855,6 +866,8 @@ static void parse_settings(char *input_file) {
             term_bold_color = parse_color(value);
         } else if (!strncmp(option, "background", strlen(option))) {
             term_background = parse_color(value);
+        } else if (!strncmp(option, "focus_follow_mouse", strlen(option))) {
+            focus_follow_mouse = (!strncmp(value, "true", strlen(value)));
         } else if (!strncmp(option, "copy_on_selection", strlen(option))) {
             copy_on_selection = (!strncmp(value, "true", strlen(value)));
         } else if (!strncmp(option, "include", strlen(option))) {
@@ -867,6 +880,8 @@ static void parse_settings(char *input_file) {
             }
         } else if (!strncmp(option, "hotkey", strlen(option))) {
             parse_hotkey(value,data);
+        } else {
+            print_line("error","Invalid config line");
         }
         memset(data, '\0', sizeof(data)); 
     }
