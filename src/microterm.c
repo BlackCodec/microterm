@@ -227,7 +227,7 @@ static gboolean on_command(GtkWidget *self, GdkEventKey* event, gpointer user_da
  * \param terminal
  * \param event
  * \param user_data
- * \return FALSE, no continue
+ * \return FALSE, propagate event
  */
 static gboolean has_focus(GtkWidget* terminal, GdkEventFocus event, gpointer user_data) {
     UNUSED(user_data);
@@ -236,6 +236,14 @@ static gboolean has_focus(GtkWidget* terminal, GdkEventFocus event, gpointer use
     return FALSE;
 }
 
+/*!
+ * Handle mouse focus change
+ *
+ * \param terminal
+ * \param event (Motion event)
+ * \param user_data
+ * \return FALSE, propagate event
+ */
 static gboolean focus_change(GtkWidget* terminal, GdkEventMotion event, gpointer user_data) {
     UNUSED(user_data);
     if (focus_follow_mouse && !gtk_widget_is_focus(terminal)) {
