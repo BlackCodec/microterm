@@ -86,7 +86,7 @@ static va_list vargs;
  * Print log (debug) message with format specifiers.
  *
  * \param level string with level of the message
- * \param format string and format specifiers for vfprintf function  
+ * \param format string and format specifiers for vfprintf function
  * \return 0 on success
  */
 static int print_line(char *level, char *format, ...) {
@@ -255,7 +255,7 @@ static gboolean focus_change(GtkWidget* terminal, GdkEventMotion event, gpointer
 
 /*!
  * Handle terminal key press events.
- * 
+ *
  * \param terminal
  * \param event (key press or release)
  * \param user_data
@@ -277,7 +277,7 @@ static gboolean on_hotkey(GtkWidget *terminal, GdkEventKey *event,gpointer user_
         print_line("trace","Invoke function: %s (%d)", function, get_function(function));
         current_terminal = terminal;
         return execute_function(function);
-    }    
+    }
     return FALSE;
 }
 
@@ -685,9 +685,10 @@ static GtkWidget* create_terminal() {
     }
     g_strfreev(envp);
     if (working_dir == NULL) {
+        print_line("trace", "Set default working_dir: %s", g_get_current_dir());
         working_dir = g_get_current_dir();
     }
-    print_line("trace", "Set workdir: %s", g_get_current_dir());
+    print_line("trace", "Set workdir: %s", working_dir);
     print_line("trace","Spawn terminal (async)");
     /* terminal, pty, work_dir, argv, env, spawn, setup fun, setup data, setup data destroy, timeout, cancellable, callback, callback data */
     vte_terminal_spawn_async(VTE_TERMINAL(terminal),VTE_PTY_DEFAULT, working_dir, command, NULL, G_SPAWN_DEFAULT, NULL, NULL, NULL, -1, NULL, terminal_callback, NULL);
@@ -720,6 +721,8 @@ static void show_hide_commander() {
 static int start_application() {
     print_line("info","Create window");
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_icon_name(GTK_WINDOW(window), "utilities-terminal");
+    gtk_window_resize(GTK_WINDOW(window), 600, 400);
     if (term_title == NULL)
         gtk_window_set_title(GTK_WINDOW(window), "µterm");
     else

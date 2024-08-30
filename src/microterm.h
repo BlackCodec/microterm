@@ -18,7 +18,7 @@
 
 #include <vte/vte.h>
 #define APP_NAME "microterm"
-#define APP_RELEASE "2.2"
+#define APP_RELEASE "2.3"
 #define TERM_FONT "Monospace"
 #define TERM_FONT_DEFAULT_SIZE 9
 #define TERM_LOCALE "en_US.UTF-8"

@@ -4,7 +4,7 @@
 
 The project is inspired by [kermit](https://github.com/orhun/kermit) (by [Orhun Parmaksız](mailto:orhunparmaksiz@gmail.com)).
 
-**Release: 2.2**
+**Release: 2.3**
 
 ---
 
@@ -122,10 +122,10 @@ font [FAMILY-LIST] [STYLE-OPTIONS] [SIZE]
 
 `FAMILY-LIST` is a comma-separated list of families optionally terminated by a comma, `STYLE_OPTIONS` is a whitespace-separated list of words where each WORD describes one of style, variant, weight, or stretch, and `SIZE` is a decimal number (size in points).
 
-• Available font families: `Normal, Sans, Serif and Monospace`.  
-• Available styles: `Normal, Oblique, Italic`.  
-• Available weights: `Ultra-Light, Light, Normal, Bold,Ultra-Bold, Heavy`.  
-• Available variants: `Normal, Small-Caps`.  
+• Available font families: `Normal, Sans, Serif and Monospace`.
+• Available styles: `Normal, Oblique, Italic`.
+• Available weights: `Ultra-Light, Light, Normal, Bold,Ultra-Bold, Heavy`.
+• Available variants: `Normal, Small-Caps`.
 • Available stretch styles: `Ultra-Condensed, Extra-Condensed, Condensed, Semi-Condensed, Normal, Semi-Expanded, Expanded, Extra-Expanded, Ultra-Expanded`.
 
 Examples:
@@ -161,6 +161,8 @@ Copyright © 2024 [BlackCodec](mailto:blackcodec@null.net)
 
 ## Changelog
 
+ - Release 2.3
+   - Add minimum width and height (600x400) so it can be used also on wm that are not tiling.
  - Release 2.2
    - Add support for focus_follow_mouse option
    - Code optimization
